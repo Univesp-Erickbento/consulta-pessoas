@@ -1,6 +1,11 @@
 package com.mypet.mypet.routes;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.component.jackson.JacksonDataFormat;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -8,8 +13,19 @@ public class PessoaRouteBuilder extends RouteBuilder {
 
     private static final String PESSOA_SERVICE_URL = "http://localhost:9090/api/pessoas";
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Override
     public void configure() throws Exception {
+        JacksonDataFormat jacksonDataFormat = new JacksonDataFormat(objectMapper, Object.class);
+
+        onException(Exception.class)
+                .log(LoggingLevel.ERROR, "Erro ao processar a troca: ${exception.message}")
+                .handled(true);
+
+
+
         // Rota para buscar pessoa por CPF
         from("direct:buscarPessoaPorCpf")
                 .setHeader("CamelHttpMethod", constant("GET"))
@@ -26,9 +42,10 @@ public class PessoaRouteBuilder extends RouteBuilder {
 
         // Rota para adicionar pessoa
         from("direct:adicionarPessoa")
+                .log(LoggingLevel.INFO, "Adicionando pessoa: ${body}")
                 .setHeader("CamelHttpMethod", constant("POST"))
                 .setHeader("Content-Type", constant("application/json"))
-                .marshal().json()
+                .marshal(jacksonDataFormat)
                 .to(PESSOA_SERVICE_URL);
     }
 }
