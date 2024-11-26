@@ -80,7 +80,6 @@
 				<artifactId>jackson-datatype-jsr310</artifactId>
 			</exclusion>
 			</exclusions>
-
 		</dependency>
 
 		<dependency>
