@@ -10,6 +10,7 @@ import org.apache.camel.component.jackson.JacksonDataFormat;
 import org.apache.camel.http.base.HttpOperationFailedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
 @Component
 public class PessoaRouteBuilder extends RouteBuilder {
 
@@ -43,8 +44,22 @@ public class PessoaRouteBuilder extends RouteBuilder {
         // Rota para buscar pessoa por CPF
         from("direct:buscarPessoaPorCpf")
                 .log(LoggingLevel.INFO, "Cabeçalhos Iniciais: ${headers}")
-                .setHeader("Authorization", simple("Bearer ${bean:authService.getToken}"))
-                .log(LoggingLevel.INFO, "Token de autorização: ${header.Authorization}")
+                .process(exchange -> {
+                    // Captura o cabeçalho Authorization diretamente do exchange
+                    String authorizationHeader = exchange.getIn().getHeader("Authorization", String.class);
+                    System.out.println("Authorization Header (dentro do processador): " + authorizationHeader);  // Log para verificar se o cabeçalho está presente
+
+                    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+                        throw new IllegalArgumentException("Token de autorização inválido ou não fornecido.");
+                    }
+
+                    // Extrai o token usando AuthService
+                    String token = authService.getToken(exchange);
+                    // Define o cabeçalho Authorization com o token
+                    exchange.getIn().setHeader("Authorization", "Bearer " + token);
+                    System.out.println("Token recebido e configurado (dentro do processador): " + token);  // Log para confirmar se o token está correto
+                })
+                .log(LoggingLevel.INFO, "Token de autorização após processamento: ${header.Authorization}")
                 .choice()
                 .when(header("Authorization").isNull())
                 .log(LoggingLevel.ERROR, "Token de autorização não fornecido")
@@ -52,6 +67,7 @@ public class PessoaRouteBuilder extends RouteBuilder {
                 .otherwise()
                 .setHeader("CamelHttpMethod", constant("GET"))
                 .setHeader("Accept", constant("application/json"))
+                .log(LoggingLevel.INFO, "URL da Requisição: " + PESSOA_SERVICE_URL + "/cpf/${header.cpf}")
                 .log(LoggingLevel.INFO, "Token de autorização configurado corretamente.")
                 .toD(PESSOA_SERVICE_URL + "/cpf/${header.cpf}")
                 .convertBodyTo(String.class);
