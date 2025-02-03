@@ -71,5 +71,43 @@ public class PessoaRouteBuilder extends RouteBuilder {
                 .log(LoggingLevel.INFO, "Token de autorização configurado corretamente.")
                 .toD(PESSOA_SERVICE_URL + "/cpf/${header.cpf}")
                 .convertBodyTo(String.class);
+
+        // Rota para atualizar pessoa
+        from("direct:atualizarPessoa")
+                .log(LoggingLevel.INFO, "Cabeçalhos Iniciais: ${headers}")
+                .process(exchange -> {
+                    // Captura o cabeçalho Authorization diretamente do exchange
+                    String authorizationHeader = exchange.getIn().getHeader("Authorization", String.class);
+                    System.out.println("Authorization Header (dentro do processador): " + authorizationHeader);  // Log para verificar se o cabeçalho está presente
+
+                    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+                        throw new IllegalArgumentException("Token de autorização inválido ou não fornecido.");
+                    }
+
+                    // Extrai o token usando AuthService
+                    String token = authService.getToken(exchange);
+                    // Define o cabeçalho Authorization com o token
+                    exchange.getIn().setHeader("Authorization", "Bearer " + token);
+                    System.out.println("Token recebido e configurado (dentro do processador): " + token);  // Log para confirmar se o token está correto
+                })
+                .log(LoggingLevel.INFO, "Token de autorização após processamento: ${header.Authorization}")
+                .choice()
+                .when(header("Authorization").isNull())
+                .log(LoggingLevel.ERROR, "Token de autorização não fornecido")
+                .throwException(new IllegalArgumentException("Token de autorização não fornecido"))
+                .otherwise()
+                .setHeader("CamelHttpMethod", constant("PUT"))  // Usando PUT para atualizar a pessoa
+                .setHeader("Accept", constant("application/json"))
+                .setHeader("Content-Type", constant("application/json"))  // Tipo de conteúdo JSON
+                .process(exchange -> {
+                    // Converte o corpo da mensagem para JSON
+                    Object body = exchange.getIn().getBody();
+                    String jsonBody = objectMapper.writeValueAsString(body);
+                    exchange.getIn().setBody(jsonBody, String.class);
+                })
+                .log(LoggingLevel.INFO, "URL da Requisição de Atualização: " + PESSOA_SERVICE_URL + "/${header.id}")
+                .log(LoggingLevel.INFO, "Token de autorização configurado corretamente.")
+                .toD(PESSOA_SERVICE_URL + "/${header.id}")
+                .convertBodyTo(String.class);  // Retorna a resposta como String, ou pode retornar o corpo da resposta como outra classe
     }
 }

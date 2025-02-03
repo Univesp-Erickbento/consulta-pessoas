@@ -13,3 +13,4 @@ public class FuncionarioDTO {
     private LocalDate dataDeAdmissao;
     private LocalDate dataDeDemissao;
 }
+
