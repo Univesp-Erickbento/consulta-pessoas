@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthService {
 
-    public String getToken(Exchange exchange) {
+    public String extractToken(Exchange exchange) {
         // Captura o cabeçalho Authorization da requisição
         String authorizationHeader = exchange.getIn().getHeader("Authorization", String.class);
 
@@ -21,6 +21,7 @@ public class AuthService {
         // Log para confirmar se o token está correto
         System.out.println("Token recebido: " + token);
 
+        // Retorna o token extraído
         return token;
     }
 }
