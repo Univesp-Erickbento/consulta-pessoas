@@ -24,6 +24,8 @@ public class ClienteServiceImpl {
             String cpf = clienteDTO.getCpf();
             Map<String, Object> headers = new HashMap<>();
             headers.put("cpf", cpf);
+            headers.put("clienteReg", clienteDTO.getClienteReg());  // Passando clienteReg nos cabeçalhos
+            headers.put("clienteStatus", clienteDTO.getClienteStatus());  // Passando clienteStatus nos cabeçalhos
 
             // Chama a rota Camel para buscar a pessoa por CPF
             String pessoaJson = producerTemplate.requestBodyAndHeaders("direct:clienteBuscarPessoaPorCpf", null, headers, String.class);
@@ -41,13 +43,8 @@ public class ClienteServiceImpl {
                     headers.put("id", pessoaMap.get("id"));
                     producerTemplate.sendBodyAndHeaders("direct:atualizarPessoa", pessoaMap, headers);
 
-                    // Cria e salva o cliente
-                    Map<String, Object> clienteMap = new HashMap<>();
-                    clienteMap.put("pessoaId", pessoaMap.get("id"));
-                    clienteMap.put("clienteReg", clienteDTO.getClienteReg());
-                    clienteMap.put("clienteStatus", clienteDTO.getClienteStatus());
-
-                    producerTemplate.sendBody("direct:salvarCliente", clienteMap);
+                    // Envia para a rota Camel que salvará o cliente
+                    producerTemplate.sendBodyAndHeaders("direct:salvarCliente", null, headers);  // Passando cabeçalhos com clienteReg e clienteStatus
 
                     return new ResponseEntity<>("Cliente adicionado com sucesso!", HttpStatus.CREATED);
                 }

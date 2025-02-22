@@ -14,52 +14,63 @@ public class ClienteRouteBuilder extends RouteBuilder {
                 .handled(true);
 
         from("direct:salvarCliente")
+                .log("Salvando cliente: ${body}")
                 .setHeader("CamelHttpMethod", constant("POST"))
                 .setHeader("Content-Type", constant("application/json"))
                 .process(exchange -> {
                     String authorizationHeader = exchange.getIn().getHeader("Authorization", String.class);
                     String cpf = exchange.getIn().getHeader("cpf", String.class);
+                    String clienteReg = exchange.getIn().getHeader("clienteReg", String.class);
+                    String clienteStatus = exchange.getIn().getHeader("clienteStatus", String.class);
+                    String idHeader = exchange.getIn().getHeader("id", String.class);
+
+                    // Log para verificar os cabeçalhos
+                    System.out.println("Token recebido: " + authorizationHeader);
+                    System.out.println("CPF recebido: " + cpf);
+                    System.out.println("clienteReg recebido: " + clienteReg);
+                    System.out.println("clienteStatus recebido: " + clienteStatus);
+                    System.out.println("idHeader recebido: " + idHeader);
+
+                    // Validação de cabeçalhos essenciais
                     if (authorizationHeader == null || authorizationHeader.isEmpty()) {
                         throw new IllegalArgumentException("Token de autorização não fornecido.");
                     }
                     if (cpf == null || cpf.isEmpty()) {
                         throw new IllegalArgumentException("CPF não fornecido.");
                     }
-                    exchange.getIn().setHeader("Authorization", authorizationHeader);
-                    exchange.getIn().setHeader("cpf", cpf);
+                    if (clienteReg == null || clienteReg.isEmpty()) {
+                        throw new IllegalArgumentException("clienteReg não fornecido.");
+                    }
+                    if (clienteStatus == null || clienteStatus.isEmpty()) {
+                        throw new IllegalArgumentException("clienteStatus não fornecido.");
+                    }
+                    if (idHeader == null || idHeader.isEmpty()) {
+                        throw new IllegalArgumentException("ID não fornecido.");
+                    }
 
-                    System.out.println("Token na rota salvarCliente: " + authorizationHeader);
-                    System.out.println("CPF na rota salvarCliente: " + cpf);
-
+                    // Criando o ClienteDTO
                     ClienteDTO clienteDTO = new ClienteDTO();
                     clienteDTO.setCpf(cpf);
-                    clienteDTO.setPessoaId((Integer) exchange.getIn().getHeader("id"));
-                    clienteDTO.setClienteReg(exchange.getIn().getHeader("clienteReg", String.class));
-                    clienteDTO.setClienteStatus(exchange.getIn().getHeader("clienteStatus", String.class));
 
+                    try {
+                        Long pessoaId = Long.valueOf(idHeader);
+                        clienteDTO.setPessoaId(pessoaId);
+                    } catch (NumberFormatException e) {
+                        throw new IllegalArgumentException("O ID fornecido não é válido.");
+                    }
+
+                    clienteDTO.setClienteReg(clienteReg);
+                    clienteDTO.setClienteStatus(clienteStatus);
+
+                    // Log para verificar o clienteDTO antes de enviar
+                    System.out.println("ClienteDTO antes de enviar para o endpoint: " + clienteDTO);
+
+                    // Colocando o clienteDTO no corpo da mensagem para ser enviado
                     exchange.getIn().setBody(clienteDTO);
                 })
-                .marshal().json()
-                .to("http://localhost:9090/api/clientes")
+                .log("Cliente DTO antes de enviar para o endpoint: ${body}")
+                .marshal().json() // Transforma o objeto ClienteDTO em JSON
+                .to("http://localhost:9090/api/clientes") // Endpoint do Spring Boot para salvar o cliente
                 .log("Cliente salvo com sucesso.");
-
-        from("direct:clienteBuscarPessoaPorCpf")
-                .process(exchange -> {
-                    String authorizationHeader = exchange.getIn().getHeader("Authorization", String.class);
-                    String cpf = exchange.getIn().getHeader("cpf", String.class);
-                    if (authorizationHeader == null || authorizationHeader.isEmpty()) {
-                        throw new IllegalArgumentException("Token de autorização não fornecido.");
-                    }
-                    if (cpf == null || cpf.isEmpty()) {
-                        throw new IllegalArgumentException("CPF não fornecido.");
-                    }
-                    exchange.getIn().setHeader("Authorization", authorizationHeader);
-                    exchange.getIn().setHeader("cpf", cpf);
-
-                    System.out.println("Token na rota clienteBuscarPessoaPorCpf: " + authorizationHeader);
-                    System.out.println("CPF na rota clienteBuscarPessoaPorCpf: " + cpf);
-                })
-                .to("direct:buscarPessoaPorCpf")
-                .log("Pessoa buscada com sucesso.");
     }
 }

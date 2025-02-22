@@ -41,15 +41,12 @@ public class ClienteController {
                     headers.put("id", pessoaMap.get("id"));
                     headers.put("cpf", cpf);
                     headers.put("Authorization", authorizationHeader);
+                    headers.put("clienteReg", clienteDTO.getClienteReg());  // Passando clienteReg nos cabeçalhos
+                    headers.put("clienteStatus", clienteDTO.getClienteStatus());  // Passando clienteStatus nos cabeçalhos
 
                     producerTemplate.sendBodyAndHeaders("direct:atualizarPessoa", pessoaMap, headers);
 
-                    Map<String, Object> clienteMap = new HashMap<>();
-                    clienteMap.put("pessoaId", pessoaMap.get("id"));
-                    clienteMap.put("clienteReg", clienteDTO.getClienteReg());
-                    clienteMap.put("clienteStatus", clienteDTO.getClienteStatus());
-
-                    producerTemplate.sendBodyAndHeaders("direct:salvarCliente", clienteMap, headers);
+                    producerTemplate.sendBodyAndHeaders("direct:salvarCliente", null, headers);  // Passando cabeçalhos com clienteReg e clienteStatus
 
                     return new ResponseEntity<>("Cliente adicionado com sucesso!", HttpStatus.CREATED);
                 }
