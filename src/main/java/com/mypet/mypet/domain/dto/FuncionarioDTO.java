@@ -10,7 +10,7 @@ public class FuncionarioDTO {
     private String funcionarioTipo;
     private String funcionarioReg;
     private String funcionarioStatus;
-    private LocalDate dataDeAdmissao;
-    private LocalDate dataDeDemissao;
+    private String dataDeAdmissao;
+    private String dataDeDemissao;
 }
 
