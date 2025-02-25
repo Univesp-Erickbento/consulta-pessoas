@@ -1,0 +1,110 @@
+  pipeline {
+    agent any
+
+    environment {
+    DOCKER_IMAGE_NAME = "consulta-de-pessoas"
+    DOCKER_IMAGE_TAG = "latest"
+    BASE_RELEASE_BRANCH = "release"  // Nome da base da branch de release
+    }
+
+    stages {
+    stage('Select Branch and Create Release') {
+    steps {
+    script {
+    // Pergunta ao usuário qual branch deve ser utilizada
+    def userBranchChoice = input(
+  message: 'Escolha a branch para a atualização:',
+  parameters: [
+    choice(name: 'BRANCH', choices: ['main', 'develop'], description: 'Selecione a branch a ser utilizada')
+  ]
+    )
+    
+    // Verifica se a branch selecionada é 'develop', e cria uma branch de release
+    if (userBranchChoice == 'develop') {
+    echo "A branch 'develop' foi selecionada. Criando a branch de release..."
+    
+    // Verificar se a branch release já existe
+  def releaseBranchExists = sh(script: "git ls-remote --heads origin ${BASE_RELEASE_BRANCH}", returnStatus: true) == 0
+    
+    if (releaseBranchExists) {
+    // Incrementar a versão da release
+    def releaseVersion = getReleaseVersion()
+    def newReleaseBranch = "${BASE_RELEASE_BRANCH}-${releaseVersion}"
+    
+    echo "A branch ${BASE_RELEASE_BRANCH} já existe. Criando uma nova release com versão ${releaseVersion}..."
+    sh "git checkout develop"
+    sh "git checkout -b ${newReleaseBranch}"
+    sh "git push origin ${newReleaseBranch}"
+    userBranchChoice = newReleaseBranch
+  } else {
+    // Caso a branch release não exista, criar a primeira versão
+    sh "git checkout develop"
+    sh "git checkout -b ${BASE_RELEASE_BRANCH}"
+    sh "git push origin ${BASE_RELEASE_BRANCH}"
+    userBranchChoice = BASE_RELEASE_BRANCH
+  }
+  }
+
+    // Fazendo o checkout da branch selecionada (release ou main)
+    echo "Fazendo checkout da branch ${userBranchChoice}..."
+    sh "git checkout ${userBranchChoice}"
+  }
+  }
+  }
+
+    stage('Build Docker Image') {
+    steps {
+    script {
+    // Construa a imagem Docker localmente
+    echo "Construindo a imagem Docker ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}..."
+    sh "docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ."
+  }
+  }
+  }
+
+    stage('Load Docker Image into Kind') {
+    steps {
+    script {
+    // Carregue a imagem Docker no cluster Kind
+    echo "Carregando a imagem Docker para o cluster Kind..."
+    sh "kind load docker-image ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+  }
+  }
+  }
+
+    stage('Update Kubernetes Deployment') {
+    steps {
+    script {
+    // Atualize o Deployment no Kubernetes com a nova imagem
+    echo "Atualizando o deployment no Kubernetes..."
+    sh "kubectl set image deployment/consulta-de-pessoas consulta-de-pessoas=${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+  }
+  }
+  }
+  }
+
+    post {
+    success {
+    echo 'Pipeline executado com sucesso!'
+  }
+    failure {
+    echo 'Falha na execução do pipeline.'
+  }
+  }
+  }
+
+    // Função para obter a versão da release incremental
+    def getReleaseVersion() {
+    // Pega a última versão da branch de release e incrementa
+  def latestRelease = sh(script: "git tag -l 'release-*' | sort -V | tail -n 1", returnStdout: true).trim()
+
+    if (latestRelease) {
+    // Extrai o número da versão da última release
+    def version = latestRelease.replace("release-", "")
+    def newVersion = (version.toBigDecimal() + 0.1).setScale(1, java.math.RoundingMode.CEILING).toString()
+    return newVersion
+  } else {
+    // Se não houver versões, retorna 1.0 como padrão
+    return "1.0"
+  }
+  }
