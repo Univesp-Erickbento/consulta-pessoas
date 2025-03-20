@@ -1,0 +1,7 @@
+mvn clean install
+./deploy.sh
+kind create cluster --config kind-consulta-de-pessoas.yaml
+kind load docker-image bmt-consulta-de-pessoas:0.0.3-SNAPSHOT --name bmt-consulta-de-pessoas
+kubectl apply -f deployment-consulta-de-pessoas.yaml
+kubectl rollout restart deployment bmt-consulta-de-pessoas
+kubectl config get-contexts
