@@ -70,7 +70,7 @@ public class ClienteRouteBuilder extends RouteBuilder {
                 })
                 .log("Cliente DTO antes de enviar para o endpoint: ${body}")
                 .marshal().json() // Transforma o objeto ClienteDTO em JSON
-                .to("http://localhost:9090/api/clientes") // Endpoint do Spring Boot para salvar o cliente
+                .to("http://192.168.15.115:9090/api/clientes") // Endpoint do Spring Boot para salvar o cliente
                 .log("Cliente salvo com sucesso.");
     }
 }

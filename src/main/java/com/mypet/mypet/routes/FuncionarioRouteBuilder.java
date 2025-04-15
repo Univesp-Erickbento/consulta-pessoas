@@ -78,7 +78,7 @@ public class FuncionarioRouteBuilder extends RouteBuilder {
                     exchange.getIn().setBody(funcionarioDTO);
                 })
                 .marshal().json()
-                .to("http://localhost:9090/api/funcionarios")
+                .to("http://192.168.15.115:9090/api/funcionarios")
                 .log("Funcionário salvo com sucesso.");
     }
 }

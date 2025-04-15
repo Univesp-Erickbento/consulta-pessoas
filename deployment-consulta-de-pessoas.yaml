@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: bmt-consulta-de-pessoas
-          image: bmt-consulta-de-pessoas:0.0.3-SNAPSHOT  # Imagem conforme o Docker
+          image: bmt-consulta-de-pessoas:0.0.4-SNAPSHOT  # Imagem conforme o Docker
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080  # Porta do container, ajustada para 8080
@@ -33,7 +33,7 @@ spec:
     - protocol: TCP
       port: 8080           # Porta exposta no Kubernetes (pode ser acessada por outros pods ou serviços)
       targetPort: 8080     # Porta interna do container
-      nodePort: 30080      # Defina um número de porta exclusivo (garanta que não esteja em conflito)
+      nodePort: 30070      # Defina um número de porta exclusivo (garanta que não esteja em conflito)
   type: NodePort  # Tipo de serviço para comunicação externa
   # Caso precise expor o serviço para um IP específico, descomente a linha abaixo:
   # externalIPs:

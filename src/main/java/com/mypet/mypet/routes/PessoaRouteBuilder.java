@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class PessoaRouteBuilder extends RouteBuilder {
 
-    private static final String PESSOA_SERVICE_URL = "http://localhost:9090/api/pessoas";
+    private static final String PESSOA_SERVICE_URL = "http://192.168.15.115:9090/api/pessoas";
 
     @Autowired
     private ObjectMapper objectMapper;
