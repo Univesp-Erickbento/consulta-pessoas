@@ -3,6 +3,8 @@ package com.mypet.mypet.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mypet.mypet.domain.dto.ClienteDTO;
 import org.apache.camel.ProducerTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,50 +15,86 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/clientes")
+@CrossOrigin(origins = "*", allowedHeaders = "*") // CORS para testes locais
 public class ClienteController {
+
+    private static final Logger log = LoggerFactory.getLogger(ClienteController.class);
 
     @Autowired
     private ProducerTemplate producerTemplate;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @PostMapping("/adicionar")
-    public ResponseEntity<?> adicionarCliente(@RequestBody ClienteDTO clienteDTO, @RequestHeader("Authorization") String authorizationHeader) {
+    public ResponseEntity<?> adicionarCliente(@RequestBody ClienteDTO clienteDTO,
+                                              @RequestHeader("Authorization") String authorizationHeader) {
+
         try {
             String cpf = clienteDTO.getCpf();
+            log.info("Recebido CPF: {}", cpf);
+            log.info("Recebido Token: {}", authorizationHeader);
 
+            if (authorizationHeader == null || authorizationHeader.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("mensagem", "Token de autorização não fornecido."));
+            }
+
+            // Headers que serão reutilizados
             Map<String, Object> headers = new HashMap<>();
             headers.put("cpf", cpf);
             headers.put("Authorization", authorizationHeader);
+            headers.put("clienteReg", clienteDTO.getClienteReg());
+            headers.put("clienteStatus", clienteDTO.getClienteStatus());
 
             String pessoaJson = producerTemplate.requestBodyAndHeaders("direct:buscarPessoaPorCpf", null, headers, String.class);
+            log.info("Resposta da rota 'buscarPessoaPorCpf': {}", pessoaJson);
 
-            if (pessoaJson != null && !pessoaJson.isEmpty()) {
-                ObjectMapper objectMapper = new ObjectMapper();
-                Map<String, Object> pessoaMap = objectMapper.readValue(pessoaJson, HashMap.class);
-
-                if (pessoaMap.get("perfis").toString().contains("CLIENTE")) {
-                    return new ResponseEntity<>("Essa pessoa já é um cliente cadastrado.", HttpStatus.BAD_REQUEST);
-                } else {
-                    pessoaMap.put("perfis", pessoaMap.get("perfis") + ",CLIENTE");
-
-                    headers.put("id", pessoaMap.get("id"));
-                    headers.put("cpf", cpf);
-                    headers.put("Authorization", authorizationHeader);
-                    headers.put("clienteReg", clienteDTO.getClienteReg());  // Passando clienteReg nos cabeçalhos
-                    headers.put("clienteStatus", clienteDTO.getClienteStatus());  // Passando clienteStatus nos cabeçalhos
-
-                    producerTemplate.sendBodyAndHeaders("direct:atualizarPessoa", pessoaMap, headers);
-
-                    producerTemplate.sendBodyAndHeaders("direct:salvarCliente", null, headers);  // Passando cabeçalhos com clienteReg e clienteStatus
-
-                    return new ResponseEntity<>("Cliente adicionado com sucesso!", HttpStatus.CREATED);
-                }
-            } else {
-                return new ResponseEntity<>("Pessoa não encontrada.", HttpStatus.NOT_FOUND);
+            if (pessoaJson == null || pessoaJson.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("mensagem", "Pessoa não encontrada."));
             }
+
+            Map<String, Object> pessoaMap = objectMapper.readValue(pessoaJson, HashMap.class);
+
+            Object perfisObj = pessoaMap.get("perfis");
+            String perfis = (perfisObj != null) ? perfisObj.toString() : "";
+
+            if (perfis.contains("CLIENTE")) {
+                return ResponseEntity.badRequest().body(Map.of("mensagem", "Essa pessoa já é um Cliente cadastrado."));
+            }
+
+            // Adiciona perfil de cliente
+            pessoaMap.put("perfis", perfis + ",CLIENTE");
+
+            // Pega o ID com verificação de null
+            Object idObj = pessoaMap.get("id");
+            if (idObj == null) {
+                log.error("Campo 'id' não encontrado no JSON da pessoa. JSON recebido: {}", pessoaMap);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("mensagem", "Campo 'id' não encontrado na resposta da pessoa."));
+            }
+
+            headers.put("id", idObj.toString());
+
+            // Atualiza dados da pessoa
+            producerTemplate.sendBodyAndHeaders("direct:atualizarPessoa", pessoaMap, headers);
+
+            // Prepara dados para salvar o cliente
+            Map<String, Object> clienteMap = new HashMap<>();
+            clienteMap.put("pessoaId", idObj.toString());
+            clienteMap.put("clienteReg", clienteDTO.getClienteReg());
+            clienteMap.put("clienteStatus", clienteDTO.getClienteStatus());
+
+            producerTemplate.sendBodyAndHeaders("direct:salvarCliente", clienteMap, headers);
+
+            // ✅ Resposta JSON
+            Map<String, String> response = new HashMap<>();
+            response.put("mensagem", "Cliente adicionado com sucesso!");
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
         } catch (Exception e) {
-            System.err.println("Erro ao adicionar cliente: " + e.getMessage());
-            e.printStackTrace();
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            log.error("Erro ao adicionar Cliente: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("mensagem", "Erro interno ao processar a solicitação."));
         }
     }
 }
