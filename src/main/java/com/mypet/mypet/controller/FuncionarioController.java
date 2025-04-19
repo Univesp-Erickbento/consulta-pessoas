@@ -1,7 +1,7 @@
 package com.mypet.mypet.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mypet.mypet.domain.dto.FuncionarioDTO;
+import com.mypet.mypet.domain.dtos.FuncionarioDTO;
 import org.apache.camel.ProducerTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

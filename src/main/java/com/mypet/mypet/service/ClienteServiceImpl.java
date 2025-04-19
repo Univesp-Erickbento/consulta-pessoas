@@ -1,7 +1,7 @@
 package com.mypet.mypet.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mypet.mypet.domain.dto.ClienteDTO;
+import com.mypet.mypet.domain.dtos.clientedto.ClienteDTO;
 import org.apache.camel.ProducerTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

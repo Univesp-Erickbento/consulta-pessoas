@@ -1,4 +1,4 @@
-package com.mypet.mypet.domain.dto;
+package com.mypet.mypet.domain.dtos.clientedto;
 
 import lombok.Data;
 

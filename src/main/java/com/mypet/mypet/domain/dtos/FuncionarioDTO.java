@@ -1,7 +1,6 @@
-package com.mypet.mypet.domain.dto;
+package com.mypet.mypet.domain.dtos;
 
 import lombok.Data;
-import java.time.LocalDate;
 
 @Data
 public class FuncionarioDTO {

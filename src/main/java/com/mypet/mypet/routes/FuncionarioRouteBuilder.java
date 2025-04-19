@@ -1,11 +1,8 @@
 package com.mypet.mypet.routes;
 
-import com.mypet.mypet.domain.dto.FuncionarioDTO;
+import com.mypet.mypet.domain.dtos.FuncionarioDTO;
 import org.apache.camel.builder.RouteBuilder;
 import org.springframework.stereotype.Component;
-
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 @Component
 public class FuncionarioRouteBuilder extends RouteBuilder {

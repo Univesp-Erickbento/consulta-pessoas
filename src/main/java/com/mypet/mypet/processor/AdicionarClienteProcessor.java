@@ -1,7 +1,7 @@
 package com.mypet.mypet.processor;
 
 
-import com.mypet.mypet.domain.dto.ClienteDTO;
+import com.mypet.mypet.domain.dtos.clientedto.ClienteDTO;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 import org.springframework.stereotype.Component;
