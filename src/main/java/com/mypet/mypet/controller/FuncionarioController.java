@@ -15,7 +15,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/funcionarios")
-@CrossOrigin(origins = "*", allowedHeaders = "*") // CORS para testes locais
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class FuncionarioController {
 
     private static final Logger log = LoggerFactory.getLogger(FuncionarioController.class);
@@ -25,6 +25,40 @@ public class FuncionarioController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    // 🚀 Endpoint revertido: Buscar funcionário por pessoaId
+    @GetMapping("/pessoa/{pessoaId}")
+    public ResponseEntity<?> buscarFuncionarioPorPessoaId(
+            @PathVariable Long pessoaId,
+            @RequestHeader("Authorization") String authorizationHeader) {
+
+        try {
+            log.info("Buscando funcionário com pessoaId: {}", pessoaId);
+            log.info("Token recebido: {}", authorizationHeader);
+
+            if (authorizationHeader == null || authorizationHeader.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("mensagem", "Token de autorização não fornecido."));
+            }
+
+            Map<String, Object> headers = new HashMap<>();
+            headers.put("Authorization", authorizationHeader);
+            headers.put("pessoaId", pessoaId);
+
+            String funcionarioJson = producerTemplate.requestBodyAndHeaders(
+                    "direct:buscarFuncionarioPorPessoaId", null, headers, String.class);
+
+            if (funcionarioJson == null || funcionarioJson.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("mensagem", "Funcionário não encontrado."));
+            }
+
+            return ResponseEntity.ok(objectMapper.readValue(funcionarioJson, Map.class));
+        } catch (Exception e) {
+            log.error("Erro ao buscar funcionário por pessoaId: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("mensagem", "Erro ao buscar funcionário."));
+        }
+    }
 
     @PostMapping("/adicionar")
     public ResponseEntity<?> adicionarFuncionario(
@@ -40,7 +74,6 @@ public class FuncionarioController {
                 return ResponseEntity.badRequest().body(Map.of("mensagem", "Token de autorização não fornecido."));
             }
 
-            // Headers que serão reutilizados
             Map<String, Object> headers = new HashMap<>();
             headers.put("cpf", cpf);
             headers.put("Authorization", authorizationHeader);
@@ -72,10 +105,8 @@ public class FuncionarioController {
                 return ResponseEntity.badRequest().body(Map.of("mensagem", "Essa pessoa já é um funcionário cadastrado."));
             }
 
-            // Adiciona perfil de funcionário
             pessoaMap.put("perfis", perfis + ",FUNCIONARIO");
 
-            // Pega o ID com verificação de null
             Object idObj = pessoaMap.get("id");
             if (idObj == null) {
                 log.error("Campo 'id' não encontrado no JSON da pessoa. JSON recebido: {}", pessoaMap);
@@ -85,7 +116,7 @@ public class FuncionarioController {
 
             headers.put("id", idObj.toString());
 
-            // Atualiza dados da pessoa
+            // Atualizar dados da pessoa
             producerTemplate.sendBodyAndHeaders("direct:atualizarPessoa", pessoaMap, headers);
 
             // Prepara dados para salvar o funcionário
@@ -105,10 +136,8 @@ public class FuncionarioController {
 
             producerTemplate.sendBodyAndHeaders("direct:salvarFuncionario", funcionarioMap, headers);
 
-            // ✅ Resposta JSON ao invés de texto simples
-            Map<String, String> response = new HashMap<>();
-            response.put("mensagem", "Funcionário adicionado com sucesso!");
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(Map.of("mensagem", "Funcionário adicionado com sucesso!"));
 
         } catch (Exception e) {
             log.error("Erro ao adicionar funcionário: {}", e.getMessage(), e);
