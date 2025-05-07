@@ -1,0 +1,97 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ Checkout do código
+        uses: actions/checkout@v3
+
+      - name: ☕ Configurar Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🧪 Build com Maven
+        run: mvn clean install -DskipTests
+
+      - name: 📦 Obter versão do projeto (pom.xml)
+        id: project_version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: 🐳 Login no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 🏗️ Build da imagem Docker
+        run: docker build -t torresbento/tbmt-consulta-de-pessoas:${{ steps.project_version.outputs.version }} .
+
+      - name: 📤 Push para Docker Hub
+        run: docker push torresbento/tbmt-consulta-de-pessoas:${{ steps.project_version.outputs.version }}
+
+      - name: 🚀 Verificar segredo REMOTE_HOST
+        id: check_remote_host
+        run: |
+          if [ -z "${{ secrets.REMOTE_HOST }}" ]; then
+            echo "ERROR: REMOTE_HOST not set!"
+            exit 1
+          else
+            echo "REMOTE_HOST is set to ${REMOTE_HOST}"
+          fi
+
+      - name: 🚀 Deploy no servidor via SSH
+        if: success()
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.REMOTE_PORT }}  # se não for 22, senão pode remover
+          script: |
+            echo "⛔ Parando container antigo (se existir)..."
+            sudo docker stop consulta-pessoas || true
+
+            echo "🗑️ Removendo container antigo (se existir)..."
+            sudo docker rm consulta-pessoas || true
+
+            echo "🧹 Removendo imagem antiga (se existir)..."
+            sudo docker image prune -a -f --filter "label=project=consulta-pessoas" || true
+
+            echo "⬇️ Baixando nova imagem..."
+            sudo docker pull torresbento/tbmt-consulta-de-pessoas:${{ steps.project_version.outputs.version }}
+
+            echo "🌐 Garantindo que a rede Docker personalizada exista com o subnet correto..."
+            # Verificando se a rede tbmt-rede-docker existe e se tem o subnet correto
+            if sudo docker network inspect tbmt-rede-docker > /dev/null 2>&1; then
+              # Se a rede já existir, verifique o subnet
+              echo "Rede tbmt-rede-docker já existe. Verificando subnet..."
+              if ! sudo docker network inspect tbmt-rede-docker | grep -q '"Subnet": "172.18.0.0/16"'; then
+                echo "A rede tbmt-rede-docker não tem o subnet correto. Removendo e recriando..."
+                sudo docker network rm tbmt-rede-docker || true
+                sudo docker network create --driver bridge --subnet 172.18.0.0/16 tbmt-rede-docker
+              else
+                echo "Rede tbmt-rede-docker já existe com o subnet correto."
+              fi
+            else
+              # Se a rede não existir, cria uma nova rede com o subnet correto
+              echo "Rede tbmt-rede-docker não encontrada. Criando nova rede..."
+              sudo docker network create --driver bridge --subnet 172.18.0.0/16 tbmt-rede-docker
+            fi
+
+            echo "🏃 Subindo novo container..."
+            # Removemos a atribuição do IP fixo, deixando o Docker atribuir automaticamente
+            sudo docker run -d --name consulta-pessoas \
+              --label project=consulta-pessoas \
+              --network tbmt-rede-docker \
+              -p 9091:9091 \
+              torresbento/tbmt-consulta-de-pessoas:${{ steps.project_version.outputs.version }}
