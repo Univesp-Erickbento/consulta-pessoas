@@ -1,22 +1,30 @@
 package com.mypet.mypet.routes;
 
+import com.mypet.mypet.config.PessoaProperties;
 import com.mypet.mypet.domain.dtos.FuncionarioDTO;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.model.dataformat.JsonLibrary;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 public class FuncionarioRouteBuilder extends RouteBuilder {
 
+    @Autowired
+    private PessoaProperties pessoaProperties;
+
     @Override
     public void configure() throws Exception {
-        // Tratar exceções dentro das rotas
+        // Tratamento global de exceções
         onException(Exception.class)
-                .log("Erro ao processar a rota: ${exception.message}")
+                .log("❌ Erro ao processar a rota de funcionário: ${exception.message}")
                 .handled(true);
 
-        // 📌 Rota para salvar o funcionário (padrão igual ao cliente)
+        // 🔹 Rota para salvar funcionário
         from("direct:salvarFuncionario")
-                .log("Salvando funcionário: ${body}")
+                .log("➡️ Salvando funcionário: ${body}")
                 .setHeader("CamelHttpMethod", constant("POST"))
                 .setHeader("Content-Type", constant("application/json"))
                 .process(exchange -> {
@@ -28,63 +36,45 @@ public class FuncionarioRouteBuilder extends RouteBuilder {
                     String dataDeDemissao = exchange.getIn().getHeader("dataDeDemissao", String.class);
                     String idHeader = exchange.getIn().getHeader("id", String.class);
 
-                    // Validações
-                    if (authorizationHeader == null || authorizationHeader.isEmpty()) {
+                    if (authorizationHeader == null || authorizationHeader.isEmpty())
                         throw new IllegalArgumentException("Token de autorização não fornecido.");
-                    }
-                    if (funcionarioReg == null || funcionarioReg.isEmpty()) {
+                    if (funcionarioReg == null || funcionarioReg.isEmpty())
                         throw new IllegalArgumentException("funcionarioReg não fornecido.");
-                    }
-                    if (funcionarioStatus == null || funcionarioStatus.isEmpty()) {
+                    if (funcionarioStatus == null || funcionarioStatus.isEmpty())
                         throw new IllegalArgumentException("funcionarioStatus não fornecido.");
-                    }
-                    if (funcionarioTipo == null || funcionarioTipo.isEmpty()) {
+                    if (funcionarioTipo == null || funcionarioTipo.isEmpty())
                         throw new IllegalArgumentException("funcionarioTipo não fornecido.");
-                    }
-                    if (idHeader == null || idHeader.isEmpty()) {
+                    if (idHeader == null || idHeader.isEmpty())
                         throw new IllegalArgumentException("ID não fornecido.");
-                    }
 
                     long pessoaId = Long.parseLong(idHeader);
+                    funcionarioStatus = funcionarioStatus.toUpperCase();
 
-                    // Criar o DTO
                     FuncionarioDTO funcionarioDTO = new FuncionarioDTO();
                     funcionarioDTO.setPessoaId(pessoaId);
                     funcionarioDTO.setFuncionarioReg(funcionarioReg);
-                    funcionarioDTO.setFuncionarioStatus(funcionarioStatus.toUpperCase());
+                    funcionarioDTO.setFuncionarioStatus(funcionarioStatus);
                     funcionarioDTO.setFuncionarioTipo(funcionarioTipo);
                     funcionarioDTO.setDataDeAdmissao(dataDeAdmissao);
                     funcionarioDTO.setDataDeDemissao(dataDeDemissao);
 
                     exchange.getIn().setBody(funcionarioDTO);
-
-                    System.out.println("FuncionarioDTO a ser enviado: " + funcionarioDTO);
                 })
-                .log("Payload enviado: ${body}")
-                .marshal().json()
-                .to("http://192.168.15.115:9090/api/funcionarios")
-                .log("Funcionário salvo com sucesso.");
+                .log("📤 Payload enviado: ${body}")
+                .marshal().json(JsonLibrary.Jackson)
+                .toD("${bean:pessoaProperties?method=getPessoaFuncionarioBaseUrl()}?bridgeEndpoint=true")
+                .log("🧪 URL de destino do POST funcionário: ${bean:pessoaProperties?method=getPessoaFuncionarioBaseUrl()}")
+                .log("✅ Funcionário salvo com sucesso.");
 
-        // 📌 Rota para buscar funcionário por pessoaId
+        // 🔹 Rota para buscar funcionário por pessoaId
         from("direct:buscarFuncionarioPorPessoaId")
+                .log("🔍 Buscando funcionário pelo pessoaId: ${header.pessoaId}")
                 .setHeader("CamelHttpMethod", constant("GET"))
-                .process(exchange -> {
-                    String pessoaId = exchange.getIn().getHeader("pessoaId", String.class);
-                    String token = exchange.getIn().getHeader("Authorization", String.class);
-
-                    if (pessoaId == null || pessoaId.isEmpty()) {
-                        throw new IllegalArgumentException("PessoaId não fornecido.");
-                    }
-                    if (token == null || token.isEmpty()) {
-                        throw new IllegalArgumentException("Token de autorização não fornecido.");
-                    }
-
-                    // 📌 Aqui é o endpoint da API externa (mesmo que o cliente)
-                    String url = "http://192.168.15.115:9090/api/funcionarios/pessoa/" + pessoaId;
-                    exchange.getIn().setHeader("CamelHttpUri", url);
-                    exchange.getIn().setHeader("Authorization", token);
-                })
-                .toD("${header.CamelHttpUri}?bridgeEndpoint=true&throwExceptionOnFailure=false")
-                .log("Resposta da busca por funcionário: ${body}");
+                .setHeader("Authorization", simple("${header.Authorization}"))
+                .toD("${bean:pessoaProperties?method=getPessoaFuncionarioBaseUrl()}/pessoa/${header.pessoaId}?bridgeEndpoint=true")
+                .log("📦 Corpo bruto da resposta: ${body}")
+                .unmarshal().json(JsonLibrary.Jackson, FuncionarioDTO.class)
+                .log("✅ Funcionario encontrado: ${body}");
     }
+
 }
