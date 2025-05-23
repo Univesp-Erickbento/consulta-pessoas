@@ -7,8 +7,6 @@ import org.apache.camel.model.dataformat.JsonLibrary;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
 @Component
 public class FuncionarioRouteBuilder extends RouteBuilder {
 
@@ -17,7 +15,7 @@ public class FuncionarioRouteBuilder extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        // Tratamento global de exceções
+        // Tratamento de exceções
         onException(Exception.class)
                 .log("❌ Erro ao processar a rota de funcionário: ${exception.message}")
                 .handled(true);
@@ -29,31 +27,27 @@ public class FuncionarioRouteBuilder extends RouteBuilder {
                 .setHeader("Content-Type", constant("application/json"))
                 .process(exchange -> {
                     String authorizationHeader = exchange.getIn().getHeader("Authorization", String.class);
+                    if (authorizationHeader == null || authorizationHeader.isEmpty())
+                        throw new IllegalArgumentException("Token de autorização não fornecido.");
+
+                    Long pessoaId = Long.parseLong(exchange.getIn().getHeader("id", String.class));
                     String funcionarioReg = exchange.getIn().getHeader("funcionarioReg", String.class);
                     String funcionarioStatus = exchange.getIn().getHeader("funcionarioStatus", String.class);
                     String funcionarioTipo = exchange.getIn().getHeader("funcionarioTipo", String.class);
                     String dataDeAdmissao = exchange.getIn().getHeader("dataDeAdmissao", String.class);
                     String dataDeDemissao = exchange.getIn().getHeader("dataDeDemissao", String.class);
-                    String idHeader = exchange.getIn().getHeader("id", String.class);
 
-                    if (authorizationHeader == null || authorizationHeader.isEmpty())
-                        throw new IllegalArgumentException("Token de autorização não fornecido.");
                     if (funcionarioReg == null || funcionarioReg.isEmpty())
                         throw new IllegalArgumentException("funcionarioReg não fornecido.");
                     if (funcionarioStatus == null || funcionarioStatus.isEmpty())
                         throw new IllegalArgumentException("funcionarioStatus não fornecido.");
                     if (funcionarioTipo == null || funcionarioTipo.isEmpty())
                         throw new IllegalArgumentException("funcionarioTipo não fornecido.");
-                    if (idHeader == null || idHeader.isEmpty())
-                        throw new IllegalArgumentException("ID não fornecido.");
-
-                    long pessoaId = Long.parseLong(idHeader);
-                    funcionarioStatus = funcionarioStatus.toUpperCase();
 
                     FuncionarioDTO funcionarioDTO = new FuncionarioDTO();
                     funcionarioDTO.setPessoaId(pessoaId);
                     funcionarioDTO.setFuncionarioReg(funcionarioReg);
-                    funcionarioDTO.setFuncionarioStatus(funcionarioStatus);
+                    funcionarioDTO.setFuncionarioStatus(funcionarioStatus.toUpperCase());
                     funcionarioDTO.setFuncionarioTipo(funcionarioTipo);
                     funcionarioDTO.setDataDeAdmissao(dataDeAdmissao);
                     funcionarioDTO.setDataDeDemissao(dataDeDemissao);
@@ -62,8 +56,7 @@ public class FuncionarioRouteBuilder extends RouteBuilder {
                 })
                 .log("📤 Payload enviado: ${body}")
                 .marshal().json(JsonLibrary.Jackson)
-                .toD("${bean:pessoaProperties?method=getPessoaFuncionarioBaseUrl()}?bridgeEndpoint=true")
-                .log("🧪 URL de destino do POST funcionário: ${bean:pessoaProperties?method=getPessoaFuncionarioBaseUrl()}")
+                .toD("${bean:pessoaProperties.getPessoaFuncionarioBaseUrl()}?bridgeEndpoint=true")
                 .log("✅ Funcionário salvo com sucesso.");
 
         // 🔹 Rota para buscar funcionário por pessoaId
@@ -71,10 +64,9 @@ public class FuncionarioRouteBuilder extends RouteBuilder {
                 .log("🔍 Buscando funcionário pelo pessoaId: ${header.pessoaId}")
                 .setHeader("CamelHttpMethod", constant("GET"))
                 .setHeader("Authorization", simple("${header.Authorization}"))
-                .toD("${bean:pessoaProperties?method=getPessoaFuncionarioBaseUrl()}/pessoa/${header.pessoaId}?bridgeEndpoint=true")
+                .toD("${bean:pessoaProperties.getPessoaFuncionarioBaseUrl()}/pessoa/${header.pessoaId}?bridgeEndpoint=true")
                 .log("📦 Corpo bruto da resposta: ${body}")
                 .unmarshal().json(JsonLibrary.Jackson, FuncionarioDTO.class)
                 .log("✅ Funcionario encontrado: ${body}");
     }
-
 }
