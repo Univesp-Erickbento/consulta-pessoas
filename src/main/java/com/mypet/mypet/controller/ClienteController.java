@@ -88,8 +88,11 @@ public class ClienteController {
     }
 
     @GetMapping("/pessoa/{pessoaId}")
-    public ResponseEntity<?> buscarClientePorPessoaId(@PathVariable Long pessoaId,
-                                                      @RequestHeader("Authorization") String authorizationHeader) {
+
+    public ResponseEntity<?> buscarClientePorPessoaId(@PathVariable("pessoaId") Long pessoaId,
+                                                      @RequestHeader("Authorization") String authorizationHeader)
+
+ {
         try {
             log.info("Buscando cliente com pessoaId: {}", pessoaId);
 
