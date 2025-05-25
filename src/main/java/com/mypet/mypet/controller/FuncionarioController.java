@@ -26,8 +26,9 @@ public class FuncionarioController {
 
     // 🔍 Buscar funcionário por pessoaId
     @GetMapping("/pessoa/{pessoaId}")
+
     public ResponseEntity<?> buscarFuncionarioPorPessoaId(
-            @PathVariable Long pessoaId,
+            @PathVariable("pessoaId") Long pessoaId,
             @RequestHeader("Authorization") String authorizationHeader) {
 
         try {
